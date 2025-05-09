@@ -1,0 +1,8 @@
+services:
+  bot:
+    build: .
+    image: rat-bot:latest
+    container_name: rat-bot
+    restart: always
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}

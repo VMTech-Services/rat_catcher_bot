@@ -1,0 +1,14 @@
+{
+    "name": "someone_today",
+    "version": "1.0.0",
+    "main": "bot.js",
+    "scripts": {
+        "start": "node bot.js",
+        "prisma:migrate": "prisma migrate dev --name init",
+        "prisma:generate": "prisma generate"
+    },
+    "dependencies": {
+        "dotenv": "^16.0.0",
+        "telegraf": "^4.16.3"
+    }
+}

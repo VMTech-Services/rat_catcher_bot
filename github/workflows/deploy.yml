@@ -1,0 +1,31 @@
+name: rat-today deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & deploy with docker-compose
+    runs-on: [self-hosted, windows]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      - name: Stop and remove existing containers
+        shell: powershell
+        run: |
+          docker compose down --remove-orphans
+
+      - name: Build and start new container
+        shell: powershell
+        env:
+            BOT_TOKEN: ${{secrets.BOT_TOKEN}}
+        run: |
+          docker compose up -d --build
