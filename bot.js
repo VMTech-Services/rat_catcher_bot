@@ -51,7 +51,12 @@ bot.on('text', async (ctx) => {
 
     chatList[chatId].users.add(`@${username}`);
 
-    if (ctx.message.text == 'кто крыса?') {
+    if (/^крыса дебаг\!$/u.test(ctx.message.text)) {
+        await ctx.reply('---=== DEBUG DATA ===---')
+        await ctx.reply('[Current memory data]\n' + JSON.stringify(chatList, null, 2))
+    }
+
+    if (/^кто крыса\?$/u.test(ctx.message.text)) {
         const currentChat = chatList[chatId]
         const currentTime = Date.now()
         const isTimeToChoose = isYesterdayOrEarlier(currentChat.lastChosen)
