@@ -1,112 +1,240 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
+const { PrismaClient } = require('./generated/prisma');
 
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
+const prisma = new PrismaClient();
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const lines = require('./lines.json')
+const lines = require('./lines.json');
 
-const chatList = {}
+if (!BOT_TOKEN) throw new Error('Токен бота не указан в переменных окружения!');
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
-if (!BOT_TOKEN) {
-    throw new Error('Токен бота не указан в переменных окружения!');
+// ---------------- helpers ----------------
+
+// Убеждаемся, что чат есть
+async function ensureChat(chatId) {
+    return prisma.chat.upsert({
+        where: { id: chatId },
+        update: {},
+        create: { id: chatId },
+    });
 }
 
-function isYesterdayOrEarlier(timestampMs) {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    return timestampMs < todayStart;
+// Убеждаемся, что крыса есть
+async function ensureRat(username) {
+    return prisma.rat.upsert({
+        where: { username },
+        update: {},
+        create: { username },
+    });
 }
+
+// Логируем выбор «крысы дня»
+async function logChosenRat(chatId, ratName) {
+    await prisma.chosenRat.create({
+        data: { chatId, ratName }
+    });
+}
+
+// Форматтер "раз"
+function formatRaz(count) {
+    const lastTwoDigits = count % 100;
+    const lastDigit = count % 10;
+
+    let suffix;
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+        suffix = 'раз';
+    } else if (lastDigit === 1) {
+        suffix = 'раз';
+    } else if (lastDigit >= 2 && lastDigit <= 4) {
+        suffix = 'раза';
+    } else {
+        suffix = 'раз';
+    }
+
+    return `${count} ${suffix}`;
+}
+
+// ---------------- Bot setup ----------------
 
 const bot = new Telegraf(BOT_TOKEN);
-
 let botId;
 bot.telegram.getMe().then(info => { botId = info.id; });
 
-bot.on('new_chat_members', async (ctx) => {
+// Приветствие при добавлении бота в чат
+bot.on('new_chat_members', async ctx => {
     const added = ctx.message.new_chat_members;
-
-    if (added.some(member => member.id === botId)) {
+    if (added.some(m => m.id === botId)) {
         for (const line of lines.join) {
             await ctx.sendMessage(line);
-            await delay(3000)
+            await delay(3000);
         }
     }
 });
 
-bot.on('text', async (ctx) => {
-    const chatId = ctx.chat.id;
+// ---------------- Команда /rat ----------------
+
+bot.command('rat', async ctx => {
     const username = ctx.from.username;
-
-    if (!username || ctx.chat.type == 'private') return;
-
-    if (!chatList[chatId]) {
-        chatList[chatId] = {
-            users: new Set(),
-            lastRat: '',
-            lastChosen: 0,
-            lastCalled: 0
-        }
+    const chatId = ctx.chat.id;
+    if (!username || ctx.chat.type === 'private') {
+        return ctx.reply('❗ Эта команда работает только в групповом чате.');
     }
 
-    chatList[chatId].users.add(`@${username}`);
+    await ensureChat(chatId);
+    await ensureRat(username);
 
-    if (/^крыса дебаг\!$/u.test(ctx.message.text)) {
-        await ctx.reply('---=== DEBUG DATA ===---')
-        await ctx.reply('[Current memory data]\n' + JSON.stringify(chatList, null, 2))
+    const exists = await prisma.chatRat.findFirst({
+        where: { chatId, ratName: username }
+    });
+    if (exists) {
+        return ctx.reply(`${username}, вы уже крыса в этом чате.`);
     }
 
-    if (/^кто крыса\?$/u.test(ctx.message.text)) {
-        const currentChat = chatList[chatId]
-        const currentTime = Date.now()
-        const isTimeToChoose = isYesterdayOrEarlier(currentChat.lastChosen)
-        switch (true) {
-            case currentTime - currentChat.lastCalled < 3600000: {
-                ctx.reply(lines.decline[Math.floor(Math.random() * lines.decline.length)])
-            }; break;
-            case (currentTime - currentChat.lastCalled > 3600000) && !isTimeToChoose: {
-                chatList[chatId].lastCalled = Date.now()
-                for (const line of lines.intro[Math.floor(Math.random() * lines.intro.length)]) {
-                    await ctx.reply(line)
-                    await delay(3000)
-                }
-                const randWasFound = Math.floor(Math.random() * lines.wasFound.length)
-                const wasFoundLines = lines.wasFound[randWasFound]
-                for (let i = 0; i < wasFoundLines.length - 2; i++) {
-                    await ctx.reply(wasFoundLines[i])
-                    await delay(3000)
-                }
-                await ctx.replyWithPhoto(
-                    { source: './rat.jpg' },
-                    { caption: wasFoundLines[wasFoundLines.length - 1] + chatList[chatId].lastRat }
-                );
-            }; break;
-            case isTimeToChoose: {
-                const rats = Array.from(currentChat.users)
-                const randomRat = rats[Math.floor(Math.random() * rats.length)]
-                chatList[chatId].lastRat = randomRat
-                chatList[chatId].lastCalled = Date.now()
-                chatList[chatId].lastChosen = Date.now()
-                for (const line of lines.intro[Math.floor(Math.random() * lines.intro.length)]) {
-                    await ctx.reply(line)
-                    await delay(3000)
-                }
-                for (const line of lines.seacrhing[Math.floor(Math.random() * lines.seacrhing.length)]) {
-                    await ctx.reply(line)
-                    await delay(3000)
-                }
-                await ctx.replyWithPhoto(
-                    { source: './rat.jpg' },
-                    { caption: 'Крыса дня: ' + randomRat }
-                );
-            }; break;
-        }
+    await prisma.chatRat.create({ data: { chatId, ratName: username } });
+    ctx.reply(`${username}, поздравляю — вы теперь крыса этого чата!`);
+});
+
+// ---------------- Команда /unrat ----------------
+
+bot.command('unrat', async ctx => {
+    const username = ctx.from.username;
+    const chatId = ctx.chat.id;
+    if (!username || ctx.chat.type === 'private') {
+        return ctx.reply('❗ Эта команда работает только в групповом чате.');
+    }
+
+    const deleted = await prisma.chatRat.deleteMany({
+        where: { chatId, ratName: username }
+    });
+    if (deleted.count) {
+        ctx.reply(`${username}, вы больше не крыса этого чата.`);
+    } else {
+        ctx.reply(`${username}, вы и так не числились крысой.`);
     }
 });
 
-bot.launch(() => {
-    console.log('Bot started')
-})
+// ---------------- Команда /rattoday ----------------
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+bot.command('rattoday', async ctx => {
+    const chatId = ctx.chat.id;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Получаем состояние чата
+    let chat = await prisma.chat.findUnique({ where: { id: chatId } });
+    if (!chat) chat = await ensureChat(chatId);
+
+    const isNewDay = chat.lastChosen < todayStart;
+    const sinceLastCall = now - chat.lastCalled;
+
+    // Случай: слишком рано (менее часа)
+    if (sinceLastCall < 3600000) {
+        const declineLine = lines.decline[Math.floor(Math.random() * lines.decline.length)];
+        return ctx.reply(declineLine);
+    }
+
+    // Случай: уже звали сегодня, но прошло больше часа => повтор предыдущего
+    if (!isNewDay) {
+        // обновляем только lastCalled
+        await prisma.chat.update({
+            where: { id: chatId },
+            data: { lastCalled: now }
+        });
+
+        const rawRat = chat.lastRat;            // ожидаем, что хранится без '@'
+        await logChosenRat(chatId, rawRat);
+
+        // выводим по сценарию
+        const intro = lines.intro[Math.floor(Math.random() * lines.intro.length)];
+        for (const line of intro) { await ctx.reply(line); await delay(3000); }
+
+        const idx = Math.floor(Math.random() * lines.wasFound.length);
+        const wasFound = lines.wasFound[idx];
+        for (let i = 0; i < wasFound.length - 2; i++) {
+            await ctx.reply(wasFound[i]);
+            await delay(3000);
+        }
+        await ctx.replyWithPhoto(
+            { source: './rat.jpg' },
+            { caption: wasFound[wasFound.length - 1] + `@${rawRat}` }
+        );
+        return;
+    }
+
+    // Случай: выбор новой «крысы дня»
+    const rels = await prisma.chatRat.findMany({ where: { chatId }, include: { rat: true } });
+    if (rels.length === 0) {
+        return ctx.reply('В этом чате ещё нет ни одной крысы.');
+    }
+
+    // выбираем raw username
+    const usernames = rels.map(r => r.rat.username);
+    const rawRat = usernames[Math.floor(Math.random() * usernames.length)];
+
+    // обновляем состояние и логируем
+    await prisma.chat.update({
+        where: { id: chatId },
+        data: {
+            lastCalled: now,
+            lastChosen: now,
+            lastRat: rawRat
+        }
+    });
+    await logChosenRat(chatId, rawRat);
+
+    // выводим по сценарию
+    const intro2 = lines.intro[Math.floor(Math.random() * lines.intro.length)];
+    const searchSeq = lines.seacrhing[Math.floor(Math.random() * lines.seacrhing.length)];
+
+    for (const line of intro2) { await ctx.reply(line); await delay(3000); }
+    for (const line of searchSeq) { await ctx.reply(line); await delay(3000); }
+    await ctx.replyWithPhoto(
+        { source: './rat.jpg' },
+        { caption: `Крыса дня: @${rawRat}` }
+    );
+});
+
+// ---------------- Новая команда /rats ----------------
+
+bot.command('rats', async ctx => {
+    const chatId = ctx.chat.id;
+    // Список всех «крыс» чата
+    const rats = await prisma.chatRat.findMany({
+        where: { chatId },
+        include: { rat: true }
+    });
+    if (rats.length === 0) {
+        await ctx.reply('В этом чате нет крыс.');
+        await delay(1000)
+        await ctx.reply('Не уж то я перестарался?');
+        return
+    }
+    // Группируем по имени и считаем лог
+    const counts = await prisma.chosenRat.groupBy({
+        by: ['ratName'],
+        where: { chatId },
+        _count: { ratName: true }
+    });
+
+    await ctx.reply('Крысы чата значит...')
+    await delay(1000)
+    await ctx.reply('Вот же они!')
+    await delay(1000)
+
+    // Собираем ответ
+    const linesOut = rats.map(r => {
+        const name = r.rat.username;
+        const cntObj = counts.find(c => c.ratName === name);
+        const cnt = cntObj?._count.ratName || 0;
+        return `${name} - ${formatRaz(cnt)}`;
+    });
+
+    await ctx.reply(linesOut.join('\n'));
+});
+
+// ---------------- Запуск ----------------
+
+bot.launch().then(() => console.log('Bot started'));
+process.once('SIGINT', () => { prisma.$disconnect(); bot.stop('SIGINT'); });
+process.once('SIGTERM', () => { prisma.$disconnect(); bot.stop('SIGTERM'); });
