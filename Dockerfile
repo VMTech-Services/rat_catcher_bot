@@ -9,5 +9,6 @@ RUN npm install
 COPY . .
 
 RUN npx prisma generate
+RUN npx prisma migrate deploy
 
-CMD [ "entrypoint.sh" ]
+CMD [ "node", "bot.js" ]
