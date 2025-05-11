@@ -142,9 +142,6 @@ bot.command('rattoday', async ctx => {
             data: { lastCalled: now }
         });
 
-        const rawRat = chat.lastRat;            // ожидаем, что хранится без '@'
-        await logChosenRat(chatId, rawRat);
-
         // выводим по сценарию
         const intro = lines.intro[Math.floor(Math.random() * lines.intro.length)];
         for (const line of intro) { await ctx.reply(line); await delay(3000); }
@@ -157,7 +154,7 @@ bot.command('rattoday', async ctx => {
         }
         await ctx.replyWithPhoto(
             { source: './rat.jpg' },
-            { caption: wasFound[wasFound.length - 1] + `@${rawRat}` }
+            { caption: wasFound[wasFound.length - 1] + `@${chat.lastRat}` }
         );
         return;
     }
