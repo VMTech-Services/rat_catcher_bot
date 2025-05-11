@@ -27,10 +27,8 @@ jobs:
       - name: Write environment variables to .env file
         shell: powershell
         run: |
-          "@`"
-          DATABASE_URL=${{ secrets.DATABASE_URL }}
-          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-          `"@ | Out-File -Encoding ASCII .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" | Out-File -FilePath .env -Encoding ascii
+          echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" | Out-File -FilePath .env -Encoding ascii -Append
 
       - name: Build and start new container
         shell: powershell
