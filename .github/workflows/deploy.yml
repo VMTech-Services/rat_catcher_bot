@@ -12,6 +12,7 @@ jobs:
   deploy:
     name: Build & deploy with docker-compose
     runs-on: [self-hosted, windows]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -23,10 +24,15 @@ jobs:
         run: |
           docker compose down --remove-orphans
 
+      - name: Write environment variables to .env file
+        shell: powershell
+        run: |
+          "@`"
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+          `"@ | Out-File -Encoding ASCII .env
+
       - name: Build and start new container
         shell: powershell
-        env:
-            BOT_TOKEN: ${{secrets.BOT_TOKEN}}
-            DATABASE_URL: ${{secrets.DATABASE_URL}}
         run: |
           docker compose up -d --build
