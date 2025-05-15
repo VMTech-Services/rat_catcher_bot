@@ -220,12 +220,32 @@ bot.command('rats', async ctx => {
     await delay(1000)
 
     // Собираем ответ
-    const linesOut = rats.map(r => {
+    const linesOut = []
+    linesOut.push(`Участвующие крысы:`);
+
+    for (const r of rats) {
         const name = r.rat.username;
         const cntObj = counts.find(c => c.ratName === name);
         const cnt = cntObj?._count.ratName || 0;
-        return `${name} - ${formatRaz(cnt)}`;
+        linesOut.push(`${name} - ${formatRaz(cnt)}`)
+    }
+
+    const recent = await prisma.chosenRat.findMany({
+        where: { chatId },
+        orderBy: { id: 'desc' },    // самые новые по id
+        take: 5,
+        include: { rat: true }      // чтобы достать username
     });
+
+    if (recent.length > 0) {
+        const lastNames = recent.map(r => r.rat.username)
+
+        linesOut.push(`\nПоследние крысы:`);
+
+        for (const rat in lastNames) {
+            linesOut.push(`${parseInt(rat) + 1}. ${lastNames[rat]}`);
+        }
+    }
 
     await ctx.reply(linesOut.join('\n'));
 });
