@@ -5,6 +5,8 @@ const { PrismaClient } = require('./generated/prisma');
 const prisma = new PrismaClient();
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const lines = require('./lines.json');
+const fs = require('fs')
+const ratImages = fs.readdirSync('./ratimages')
 
 if (!BOT_TOKEN) throw new Error('Токен бота не указан в переменных окружения!');
 const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -153,7 +155,7 @@ bot.command('rattoday', async ctx => {
             await delay(3000);
         }
         await ctx.replyWithPhoto(
-            { source: './rat.jpg' },
+            { source: './ratimages/' + chat.lastRatImg },
             { caption: wasFound[wasFound.length - 1] + `@${chat.lastRat}` }
         );
         return;
@@ -169,13 +171,17 @@ bot.command('rattoday', async ctx => {
     const usernames = rels.map(r => r.rat.username);
     const rawRat = usernames[Math.floor(Math.random() * usernames.length)];
 
+    //выбираем картинку крысы
+    const randomRatImgId = Math.floor(Math.random() * ratImages.length)
+
     // обновляем состояние и логируем
     await prisma.chat.update({
         where: { id: chatId },
         data: {
             lastCalled: now,
             lastChosen: now,
-            lastRat: rawRat
+            lastRat: rawRat,
+            lastRatImg: randomRatImgId
         }
     });
     await logChosenRat(chatId, rawRat);
@@ -187,7 +193,7 @@ bot.command('rattoday', async ctx => {
     for (const line of intro2) { await ctx.reply(line); await delay(3000); }
     for (const line of searchSeq) { await ctx.reply(line); await delay(3000); }
     await ctx.replyWithPhoto(
-        { source: './rat.jpg' },
+        { source: './ratimages/' + ratImages[randomRatImgId] },
         { caption: `Крыса дня: @${rawRat}` }
     );
 });
