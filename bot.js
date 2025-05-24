@@ -202,59 +202,68 @@ bot.command('rattoday', async ctx => {
 
 bot.command('rats', async ctx => {
     const chatId = ctx.chat.id;
+
     // Список всех «крыс» чата
     const rats = await prisma.chatRat.findMany({
         where: { chatId },
         include: { rat: true }
     });
+
     if (rats.length === 0) {
         await ctx.reply('В этом чате нет крыс.');
         await delay(1000)
         await ctx.reply('Не уж то я перестарался?');
-        return
+        return;
     }
-    // Группируем по имени и считаем лог
+
+    // Группируем по имени и считаем количество
     const counts = await prisma.chosenRat.groupBy({
         by: ['ratName'],
         where: { chatId },
         _count: { ratName: true }
     });
 
-    await ctx.reply('Крысы чата значит...')
-    await delay(1000)
-    await ctx.reply('Вот же они!')
-    await delay(1000)
+    await ctx.reply('Крысы чата значит...');
+    await delay(1000);
+    await ctx.reply('Вот же они!');
+    await delay(1000);
 
-    // Собираем ответ
-    const linesOut = []
+    const linesOut = [];
     linesOut.push(`Участвующие крысы:`);
 
-    for (const r of rats) {
+    // Составляем список крыс с их количеством
+    const ratsWithCount = rats.map(r => {
         const name = r.rat.username;
         const cntObj = counts.find(c => c.ratName === name);
         const cnt = cntObj?._count.ratName || 0;
-        linesOut.push(`${name} - ${formatRaz(cnt)}`)
+        return { name, count: cnt };
+    });
+
+    // Сортировка по убыванию количества
+    ratsWithCount.sort((a, b) => b.count - a.count);
+
+    // Формируем строки
+    for (const { name, count } of ratsWithCount) {
+        linesOut.push(`${name} - ${formatRaz(count)}`);
     }
 
     const recent = await prisma.chosenRat.findMany({
         where: { chatId },
-        orderBy: { id: 'desc' },    // самые новые по id
+        orderBy: { id: 'desc' },
         take: 5,
-        include: { rat: true }      // чтобы достать username
+        include: { rat: true }
     });
 
     if (recent.length > 0) {
-        const lastNames = recent.map(r => r.rat.username)
-
         linesOut.push(`\nПоследние крысы:`);
-
-        for (const rat in lastNames) {
-            linesOut.push(`${parseInt(rat) + 1}. ${lastNames[rat]}`);
-        }
+        recent.forEach((r, i) => {
+            linesOut.push(`${i + 1}. ${r.rat.username}`);
+        });
     }
 
     await ctx.reply(linesOut.join('\n'));
 });
+
 
 // ---------------- Запуск ----------------
 
