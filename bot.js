@@ -155,7 +155,7 @@ bot.command('rattoday', async ctx => {
             await delay(3000);
         }
         await ctx.replyWithPhoto(
-            { source: './ratimages/' + chat.lastRatImg },
+            { source: './ratimages/' + ratImages[chat.lastRatImg] },
             { caption: wasFound[wasFound.length - 1] + `@${chat.lastRat}` }
         );
         return;
