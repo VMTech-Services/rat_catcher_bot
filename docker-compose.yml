@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/VMTech-Services/rat_catcher_bot:latest
+    image: ghcr.io/vmtech-services/rat_catcher_bot:latest
     build:
       context: .
     restart: unless-stopped
