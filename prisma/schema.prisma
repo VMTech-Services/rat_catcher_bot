@@ -1,46 +1,50 @@
 generator client {
-    provider = "prisma-client-js"
-    output   = "../generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model Chat {
-    id         BigInt      @id
-    rats       ChatRat[]
-    lastCalled DateTime    @default(dbgenerated("to_timestamp(0)"))
-    lastChosen DateTime    @default(dbgenerated("to_timestamp(0)"))
-    lastRat    String?
-    lastRatImg Int         @default(0)
-    chosenRats ChosenRat[]
+  id         BigInt      @id
+  rats       ChatRat[]
+  lastCalled DateTime    @default(now())
+  lastChosen DateTime    @default(now())
+  lastRat    String?
+  lastRatImg Int         @default(0)
+  chosenRats ChosenRat[]
+
+  @@map("chat")
 }
 
 model Rat {
-    username   String      @id @unique
-    chats      ChatRat[]
-    chosenRats ChosenRat[]
+  username   String      @id
+  chats      ChatRat[]
+  chosenRats ChosenRat[]
+  
+  @@map("rat")
 }
 
 model ChatRat {
-    chatId  BigInt
-    ratName String
-    chat    Chat   @relation(fields: [chatId], references: [id])
-    rat     Rat    @relation(fields: [ratName], references: [username])
+  chatId   BigInt
+  ratName  String
+  chat     Chat   @relation(fields: [chatId], references: [id])
+  rat      Rat    @relation(fields: [ratName], references: [username])
 
-    @@id([chatId, ratName])
-    @@map("chat_rat")
+  @@id([chatId, ratName])
+  @@map("chat_rat")
 }
 
 model ChosenRat {
-    id      Int    @id @default(autoincrement())
-    chatId  BigInt
-    ratName String
+  id       Int         @id @default(autoincrement())
+  chatId   BigInt
+  ratName  String
 
-    chat Chat @relation(fields: [chatId], references: [id])
-    rat  Rat  @relation(fields: [ratName], references: [username])
+  chat     Chat        @relation(fields: [chatId], references: [id])
+  rat      Rat         @relation(fields: [ratName], references: [username])
 
-    @@map("chosen_rat")
+  @@map("chosen_rat")
 }
