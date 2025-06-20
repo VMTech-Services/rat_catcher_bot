@@ -1,8 +1,8 @@
 services:
   app:
+    image: ghcr.io/VMTech-Services/rat_catcher_bot:latest
     build:
       context: .
-    image: rat-bot:latest
     restart: unless-stopped
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
