@@ -5,8 +5,16 @@ on:
     branches:
       - main
 
+
+
 jobs:
   build-and-push:
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
     runs-on: ubuntu-latest
 
     steps:
