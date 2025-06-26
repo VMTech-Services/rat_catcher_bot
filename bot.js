@@ -100,21 +100,38 @@ bot.command('rat', async ctx => {
 // ---------------- Команда /unrat ----------------
 
 bot.command('unrat', async ctx => {
-    const username = ctx.from.username;
     const chatId = ctx.chat.id;
-    if (!username || ctx.chat.type === 'private') {
+    const invokingUser = ctx.from;
+    const messageText = ctx.message.text;
+
+    if (ctx.chat.type === 'private') {
         return ctx.reply('❗ Эта команда работает только в групповом чате.');
     }
 
+    const admins = await ctx.getChatAdministrators();
+    const isAdmin = admins.some(admin => admin.user.id === invokingUser.id);
+
+    const match = messageText.match(/^\/unrat(?:@[\w_]+)?\s+@?([\w_]+)$/);
+    const targetUsername = match ? match[1] : invokingUser.username;
+
+    if (targetUsername !== invokingUser.username && !isAdmin) {
+        return ctx.reply('❗ Только администратор может разжаловать другого пользователя.');
+    }
+
     const deleted = await prisma.chatRat.deleteMany({
-        where: { chatId, ratName: username }
+        where: {
+            chatId,
+            ratName: targetUsername
+        }
     });
+
     if (deleted.count) {
-        ctx.reply(`${username}, вы больше не крыса этого чата.`);
+        ctx.reply(`@${targetUsername} больше не крыса этого чата.`);
     } else {
-        ctx.reply(`${username}, вы и так не числились крысой.`);
+        ctx.reply(`@${targetUsername} и так не числился крысой.`);
     }
 });
+
 
 // ---------------- Команда /rattoday ----------------
 
