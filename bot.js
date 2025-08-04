@@ -97,7 +97,7 @@ bot.command('rat', async ctx => {
     ctx.reply(`${username}, поздравляю — вы теперь крыса этого чата!`);
 });
 
-// ---------------- Команда /unrat ----------------
+// ---------------- /unrat ----------------
 
 bot.command('unrat', async ctx => {
     const chatId = ctx.chat.id;
@@ -133,12 +133,16 @@ bot.command('unrat', async ctx => {
 });
 
 
-// ---------------- Команда /rattoday ----------------
+// ---------------- /rattoday ----------------
 
 bot.command('rattoday', async ctx => {
     const chatId = ctx.chat.id;
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (ctx.chat.type === 'private') {
+        return ctx.reply('❗ Эта команда работает только в групповом чате.');
+    }
 
     // Получаем состояние чата
     let chat = await prisma.chat.findUnique({ where: { id: chatId } });
@@ -215,10 +219,14 @@ bot.command('rattoday', async ctx => {
     );
 });
 
-// ---------------- Новая команда /rats ----------------
+// ---------------- /rats ----------------
 
 bot.command('rats', async ctx => {
     const chatId = ctx.chat.id;
+
+    if (ctx.chat.type === 'private') {
+        return ctx.reply('❗ Эта команда работает только в групповом чате.');
+    }
 
     // Список всех «крыс» чата
     const rats = await prisma.chatRat.findMany({
@@ -281,6 +289,22 @@ bot.command('rats', async ctx => {
     await ctx.reply(linesOut.join('\n'));
 });
 
+// ---------------- /dbg_ratimages ----------------
+
+bot.command('dbg_ratimages', async (ctx) => {
+    if (ctx.chat.type !== 'private') {
+        return ctx.reply('❗ Эта команда для отладки и работает только в личные сообщениях с ботом.');
+    }
+
+    await ctx.reply('Вот все картинки с крысами что есть')
+
+    for (const imgID in ratImages) {
+        await ctx.replyWithPhoto(
+            { source: './ratimages/' + ratImages[imgID] },
+            { caption: `Файл: ${ratImages[imgID]}` }
+        );
+    }
+})
 
 // ---------------- Запуск ----------------
 
