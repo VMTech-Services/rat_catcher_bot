@@ -13,15 +13,23 @@ datasource db {
 }
 
 model User {
-    id        BigInt     @id @unique
-    username  String     @unique
+    id       BigInt   @id @unique
+    username String   @unique
+    joinDate DateTime @default(now())
+    ratCount Int      @default(0)
+
     chatUsers ChatUser[]
     chatRats  ChatRat[]
+
+    optOut Boolean @default(false)
 }
 
 model Chat {
-    id        BigInt     @id @unique
-    chatName  String
+    id               BigInt   @id @unique
+    chatName         String
+    joinDate         DateTime @default(now())
+    lastPinnedRatMsg BigInt?
+
     chatUsers ChatUser[]
     chatRats  ChatRat[]
 }
@@ -33,17 +41,20 @@ model ChatUser {
     chat   Chat   @relation(fields: [chatId], references: [id])
     chatId BigInt
 
+    optOut   Boolean  @default(false)
+    joinDate DateTime @default(now())
+    ratCount Int      @default(0)
+
     @@id([userId, chatId])
 }
 
 model ChatRat {
     user   User   @relation(fields: [userId], references: [id])
     userId BigInt
+
     chat   Chat   @relation(fields: [chatId], references: [id])
     chatId BigInt
 
-    date DateTime @default(now())
-
-    @@id([userId, chatId])
+    date      DateTime @id @default(now())
+    ratImageN Int      @default(0)
 }
-
