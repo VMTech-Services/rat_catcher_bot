@@ -1,0 +1,10 @@
+-- CreateTable
+CREATE TABLE "ChatRat" (
+    "userId" BIGINT NOT NULL,
+    "chatId" BIGINT NOT NULL,
+    "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY ("userId", "chatId"),
+    CONSTRAINT "ChatRat_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "ChatRat_chatId_fkey" FOREIGN KEY ("chatId") REFERENCES "Chat" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);

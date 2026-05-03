@@ -1,18 +1,27 @@
 {
-    "name": "someone_today",
-    "version": "1.0.0",
+    "name": "rat_catcher_bot",
+    "version": "2.0.0",
     "main": "bot.js",
+    "type": "module",
+    "private": true,
     "scripts": {
-        "start": "node bot.js",
-        "prisma:migrate": "prisma migrate dev --name init",
-        "prisma:generate": "prisma generate"
+        "prod": "node index.js",
+        "dev": "npx tsx src/index.ts",
+        "prisma:migrate": "prisma migrate dev",
+        "prisma:generate": "prisma generate",
+        "prisma:update": "npm run prisma:migrate && npm run prisma:generate"
     },
     "dependencies": {
-        "@prisma/client": "^6.7.0",
-        "dotenv": "^16.5.0",
-        "telegraf": "^4.16.3"
+        "@prisma/adapter-better-sqlite3": "^7.8.0",
+        "@prisma/client": "^7.8.0",
+        "dotenv": "^17.4.2",
+        "grammy": "^1.42.0"
     },
     "devDependencies": {
-        "prisma": "^6.7.0"
+        "@types/better-sqlite3": "^7.6.13",
+        "@types/node": "^25.6.0",
+        "prisma": "^7.8.0",
+        "tsx": "^4.21.0",
+        "typescript": "^6.0.3"
     }
 }

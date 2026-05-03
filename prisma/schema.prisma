@@ -1,50 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+    provider = "prisma-client"
+    output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+    provider = "sqlite"
+}
+
+model User {
+    id        BigInt     @id @unique
+    username  String     @unique
+    chatUsers ChatUser[]
+    chatRats  ChatRat[]
 }
 
 model Chat {
-  id         BigInt      @id
-  rats       ChatRat[]
-  lastCalled DateTime    @default(now())
-  lastChosen DateTime    @default(now())
-  lastRat    String?
-  lastRatImg Int         @default(0)
-  chosenRats ChosenRat[]
-
-  @@map("chat")
+    id        BigInt     @id @unique
+    chatName  String
+    chatUsers ChatUser[]
+    chatRats  ChatRat[]
 }
 
-model Rat {
-  username   String      @id
-  chats      ChatRat[]
-  chosenRats ChosenRat[]
-  
-  @@map("rat")
+model ChatUser {
+    user   User   @relation(fields: [userId], references: [id])
+    userId BigInt
+
+    chat   Chat   @relation(fields: [chatId], references: [id])
+    chatId BigInt
+
+    @@id([userId, chatId])
 }
 
 model ChatRat {
-  chatId   BigInt
-  ratName  String
-  chat     Chat   @relation(fields: [chatId], references: [id])
-  rat      Rat    @relation(fields: [ratName], references: [username])
+    user   User   @relation(fields: [userId], references: [id])
+    userId BigInt
+    chat   Chat   @relation(fields: [chatId], references: [id])
+    chatId BigInt
 
-  @@id([chatId, ratName])
-  @@map("chat_rat")
+    date DateTime @default(now())
+
+    @@id([userId, chatId])
 }
 
-model ChosenRat {
-  id       Int         @id @default(autoincrement())
-  chatId   BigInt
-  ratName  String
-
-  chat     Chat        @relation(fields: [chatId], references: [id])
-  rat      Rat         @relation(fields: [ratName], references: [username])
-
-  @@map("chosen_rat")
-}
