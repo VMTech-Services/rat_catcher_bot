@@ -5,7 +5,7 @@ import mention from "./userMentioner.js";
 import cron from "node-cron"
 import db from "./db.js";
 import { getImgPath } from "./ratImgProcessor.js";
-import lines from "../lines.json"
+import lines from "../lines.json" with { type: "json" };
 import { randomInt } from "node:crypto";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
