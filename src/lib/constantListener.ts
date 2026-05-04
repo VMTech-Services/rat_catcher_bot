@@ -47,7 +47,7 @@ export async function constantMessageListener(bot: Bot) {
  * @param bot 
  */
 export async function registerRatSelector(bot: Bot) {
-    cron.schedule("0 12 * * *", async () => {
+    cron.schedule("0 13 * * *", async () => {
         console.log("Starting scheduled rat-selection!")
 
         const chats = await db.chat.findMany()
@@ -122,7 +122,7 @@ export async function registerRatSelector(bot: Bot) {
                 } catch { }
             }
 
-            chatsAsync.push(ratSelectWrapper)
+            chatsAsync.push(ratSelectWrapper())
         }
 
         await Promise.all(chatsAsync)
