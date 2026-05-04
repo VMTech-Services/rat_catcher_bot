@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
 import pkg from "../../package.json" with {type: "json"}
-import db from "../lib/db";
+import db from "../lib/db.js";
 import { participantForms, pluralize, ratForms } from "../lib/pluralize";
 
 export default async function infoCommand(bot: Bot) {
