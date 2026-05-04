@@ -1,4 +1,4 @@
-import db from "./db";
+import db from "./db.js";
 
 const verifiedUsers = new Map<number, string>();
 const verifiedChats = new Map<number, string>();

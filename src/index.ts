@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
 import "dotenv/config";
-import { constantMessageListener, registerRatSelector } from "./lib/constantListener";
+import { constantMessageListener, registerRatSelector } from "./lib/constantListener.js";
 
 
 if (!process.env.BOT_TOKEN) {

@@ -1,10 +1,10 @@
 import { InputFile, InputMediaBuilder, type Bot } from "grammy";
-import { ensure, ensureChatUser } from "./verifiers";
-import chooseChatRat from "./ratSelector";
-import mention from "./userMentioner";
+import { ensure, ensureChatUser } from "./verifiers.js";
+import chooseChatRat from "./ratSelector.js";
+import mention from "./userMentioner.js";
 import cron from "node-cron"
-import db from "./db";
-import { getImgPath } from "./ratImgProcessor";
+import db from "./db.js";
+import { getImgPath } from "./ratImgProcessor.js";
 import lines from "../lines.json"
 import { randomInt } from "node:crypto";
 
