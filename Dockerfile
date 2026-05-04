@@ -15,6 +15,8 @@ RUN npm run prisma:generate
 COPY dist ./dist
 COPY ratimages ./ratimages
 
+copy prisma.config.ts ./
+
 COPY start.sh ./
 RUN chmod +x start.sh
 
