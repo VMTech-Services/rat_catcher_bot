@@ -1,11 +1,21 @@
 FROM node:20.19.1-alpine
 
-ENV DATABASE_URL=file:../data/rats.db
 WORKDIR /bot
+
+ENV DATABASE_URL="file:/bot/data/rats.db"
 VOLUME /bot/data
 
-COPY . .
-RUN npm ci
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm ci --omit=dev
+
 RUN npx prisma generate
 
-ENTRYPOINT [ "./start.sh" ]
+COPY dist ./dist
+COPY ratimages ./ratimages
+
+COPY start.sh ./
+RUN chmod +x start.sh
+
+ENTRYPOINT ["./start.sh"]

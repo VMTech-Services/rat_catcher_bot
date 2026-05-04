@@ -7,6 +7,7 @@
     "scripts": {
         "prod": "node index.js",
         "dev": "npx tsx src/index.ts",
+        "build": "prisma generate && tsc",
         "prisma:migrate": "prisma migrate dev",
         "prisma:generate": "prisma generate",
         "prisma:update": "npm run prisma:migrate && npm run prisma:generate"
@@ -22,6 +23,7 @@
         "@types/better-sqlite3": "^7.6.13",
         "@types/node": "^25.6.0",
         "@types/node-cron": "^3.0.11",
+        "@types/node-fetch": "^2.6.13",
         "prisma": "^7.8.0",
         "tsx": "^4.21.0",
         "typescript": "^6.0.3"

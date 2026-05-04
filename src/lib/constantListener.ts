@@ -5,7 +5,7 @@ import mention from "./userMentioner";
 import cron from "node-cron"
 import db from "./db";
 import { getImgPath } from "./ratImgProcessor";
-import lines from "../../lines.json"
+import lines from "../lines.json"
 import { randomInt } from "node:crypto";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -128,72 +128,6 @@ export async function registerRatSelector(bot: Bot) {
         await Promise.all(chatsAsync)
 
         console.log("Chats processed succesfully!")
-    })
-
-    bot.command('test', async (ctx) => {
-        const chatId = ctx.chat.id
-        const chat = await db.chat.findUnique({
-            where: { id: chatId }
-        })
-        const selectedUser = await chooseChatRat(chatId);
-
-        const randomSeq = {
-            preIntro: 0,//randomInt(0, lines.preIntro.length - 1),
-            intro: 0,//randomInt(0, lines.intro.length - 1),
-            search: 0,//randomInt(0, lines.search.length - 1),
-            found: 0 //randomInt(0, lines.found.length - 1)
-        };
-
-        let currentText = "";
-
-        let msgData: any
-
-        let isFirstEdit = true;
-
-        async function updateMsg(newChunk: string) {
-            if (isFirstEdit) {
-                currentText = newChunk;
-                isFirstEdit = false;
-                msgData = await bot.api.sendMessage(chatId, currentText, { parse_mode: "HTML" });
-            } else {
-                currentText += `\n\n${newChunk}`;
-                await bot.api.editMessageText(chatId, msgData.message_id, currentText, { parse_mode: "HTML" });
-            }
-        }
-
-        const stageSequence: Array<keyof typeof lines> = ["preIntro", "intro", "search", "found"];
-
-        for (const stage of stageSequence) {
-            for (const line of lines[stage][randomSeq[stage]]) {
-                await sleep(randomInt(2500, 5000));
-                await updateMsg(line);
-            }
-            currentText += "\n"
-        }
-
-        await sleep(randomInt(1000, 2000));
-
-        await bot.api.editMessageMedia(chatId, msgData.message_id, InputMediaBuilder.photo(new InputFile(getImgPath(selectedUser.randomImgN))))
-
-        await bot.api.editMessageCaption(chatId, msgData.message_id, {
-            caption: `${currentText}\n${mention({ username: selectedUser.randomUser.username, id: Number(selectedUser.randomUser.id) })}`,
-            parse_mode: "HTML",
-            show_caption_above_media: true
-        })
-
-        if (chat.lastPinnedRatMsg) {
-            await bot.api.unpinChatMessage(chatId, Number(chat.lastPinnedRatMsg))
-        }
-
-        await bot.api.pinChatMessage(chatId, msgData.message_id, { disable_notification: true })
-        await db.chat.update({
-            where: {
-                id: chatId
-            },
-            data: {
-                lastPinnedRatMsg: msgData.message_id
-            }
-        })
     })
 
     console.log("Registered rat selector")

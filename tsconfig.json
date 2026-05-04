@@ -4,10 +4,19 @@
         "moduleResolution": "bundler",
         "target": "ES2023",
         "strict": true,
+        "rootDir": "./src",
+        "outDir": "./dist",
         "esModuleInterop": true,
         "ignoreDeprecations": "6.0",
+        "forceConsistentCasingInFileNames": true,
         "types": [
             "node"
         ]
-    }
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
 }
