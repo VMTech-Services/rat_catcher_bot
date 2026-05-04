@@ -1,8 +1,3 @@
-/**
- * Склоняет слова в зависимости от числа
- * @param number Число
- * @param titles Массив форм: [1 крыса, 2 крысы, 5 крыс]
- */
 export function pluralize(number: number, titles: [string, string, string]): string {
     const cases = [2, 0, 1, 1, 1, 2];
     const index = (number % 100 > 4 && number % 100 < 20)
