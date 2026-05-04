@@ -12,7 +12,7 @@ RUN npm ci --omit=dev
 
 RUN npx prisma generate
 
-COPY dist ./dist
+COPY dist .
 COPY ratimages ./ratimages
 
 COPY start.sh ./
