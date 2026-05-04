@@ -1,7 +1,7 @@
 import { Bot } from "grammy";
 import "dotenv/config";
 import { constantMessageListener, registerRatSelector } from "./lib/constantListener.js";
-
+import commandRegisterer from "./commands/commandRegisterer.js";
 
 if (!process.env.BOT_TOKEN) {
     console.error("No bot token in ENV!")
@@ -35,6 +35,8 @@ bot.command("start", async (ctx) => {
 })
 
 await registerRatSelector(bot)
+
+await commandRegisterer(bot)
 
 bot.start({
     onStart: (botInfo) => {

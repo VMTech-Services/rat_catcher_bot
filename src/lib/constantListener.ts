@@ -47,7 +47,7 @@ export async function constantMessageListener(bot: Bot) {
  * @param bot 
  */
 export async function registerRatSelector(bot: Bot) {
-    cron.schedule("0 13 * * *", async () => {
+    cron.schedule("0 12 * * *", async () => {
         console.log("Starting scheduled rat-selection!")
 
         const chats = await db.chat.findMany()
@@ -55,6 +55,8 @@ export async function registerRatSelector(bot: Bot) {
         console.log(`Asyncly processing ${chats.length} chats!`)
 
         const chatsAsync = []
+
+        let chatsSuccess = 0
 
         for (const chat of chats) {
             async function ratSelectWrapper() {
@@ -78,7 +80,9 @@ export async function registerRatSelector(bot: Bot) {
                     if (isFirstEdit) {
                         currentText = newChunk;
                         isFirstEdit = false;
-                        msgData = await bot.api.sendMessage(chatId, currentText, { parse_mode: "HTML" });
+                        try {
+                            msgData = await bot.api.sendMessage(chatId, currentText, { parse_mode: "HTML" });
+                        } catch { return }
                     } else {
                         currentText += `\n\n${newChunk}`;
                         await bot.api.editMessageText(chatId, msgData.message_id, currentText, { parse_mode: "HTML" });
@@ -105,6 +109,8 @@ export async function registerRatSelector(bot: Bot) {
                     show_caption_above_media: true
                 })
 
+                chatsSuccess += 1
+
                 try {
                     if (chat.lastPinnedRatMsg) {
                         await bot.api.unpinChatMessage(chatId, Number(chat.lastPinnedRatMsg))
@@ -127,7 +133,7 @@ export async function registerRatSelector(bot: Bot) {
 
         await Promise.all(chatsAsync)
 
-        console.log("Chats processed succesfully!")
+        console.log(`${chatsSuccess}/${chats.length} chats processed succesfully!`)
     })
 
     console.log("Registered rat selector")
