@@ -1,6 +1,7 @@
 services:
   app:
     image: ghcr.io/vmtech-services/rat_catcher_bot:latest
+    container_name: rat_catcher_bot
     build:
       context: .
     restart: unless-stopped
