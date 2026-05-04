@@ -10,7 +10,7 @@ COPY prisma ./prisma/
 
 RUN npm ci --omit=dev
 
-RUN npx prisma generate
+RUN npm run prisma:generate
 
 COPY dist ./dist
 COPY ratimages ./ratimages
