@@ -13,7 +13,7 @@ RUN npm ci --omit=dev
 RUN npm run prisma:generate
 
 COPY assets ./assets
-
+COPY dist ./dist
 copy prisma.config.ts ./
 
 COPY start.sh ./
