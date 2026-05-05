@@ -13,10 +13,11 @@ const rouletteMemory: Record<string, {
     participants: { id: number, name: string, username: string | undefined, alive: boolean }[]
     round: number
     currentRat: number
-    revolver: boolean[]
+    revolver: boolean[],
+    initiatorID: number
 }> = {}
 
-function createGame(chatID: number) {
+function createGame(chatID: number, initiatorID: number) {
     const gameId = randomUUID().split("-")[0]
 
     rouletteMemory[gameId] = {
@@ -27,7 +28,8 @@ function createGame(chatID: number) {
         participants: [],
         round: 0,
         currentRat: 0,
-        revolver: []
+        revolver: [],
+        initiatorID
     }
 
     return gameId
@@ -57,13 +59,15 @@ export async function rouletteCommand(bot: Bot) {
             return
         }
 
-        const game = createGame(ctx.chat.id)
+        if (!ctx.from) return
+
+        const game = createGame(ctx.chat.id, ctx.from.id)
 
         const buttons = new InlineKeyboard()
             .text("Участвовать", `rlt:${game}:pt`).row()
             .text("Отмена участия", `rlt:${game}:cp`).row()
-            .text("Начать", `rlt:${game}:st`).row()
-            .text("Отмена", `rlt:${game}:cnc`)
+            .text(`Начать (${ctx.from.first_name})`, `rlt:${game}:st`).row()
+            .text(`Отмена (${ctx.from.first_name})`, `rlt:${game}:cnc`)
 
         const msg = await ctx.reply(defaultGameText + `\n\nУчастники:\n...`, {
             parse_mode: "HTML",
@@ -134,6 +138,8 @@ export async function rouletteCommand(bot: Bot) {
             }; break;
             //region start game
             case "st": {
+                if (ctx.from.id !== game.initiatorID) return
+
                 while (true) {
                     const aliveRats = game.participants.filter(rat => rat.alive)
 
@@ -228,6 +234,8 @@ export async function rouletteCommand(bot: Bot) {
             }; break;
             //region cancel game
             case "cnc": {
+                if (ctx.from.id !== game.initiatorID) return
+
                 await bot.api.editMessageText(
                     game.chatID,
                     game.firstMessageID,
