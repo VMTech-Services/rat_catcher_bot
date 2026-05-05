@@ -221,6 +221,8 @@ export async function rouletteCommand(bot: Bot) {
                         })
 
                     game.lastMessageID = newMsg.message_id
+
+                    await sleep(randomInt(2000, 5000))
                 }
 
             }; break;
