@@ -137,7 +137,38 @@ export async function rouletteCommand(bot: Bot) {
                 while (true) {
                     const aliveRats = game.participants.filter(rat => rat.alive)
 
-                    if (aliveRats.length === 0) {
+                    if (aliveRats.length === 1) {
+                        const winner = aliveRats[0]
+
+                        await bot.api.editMessageText(
+                            game.chatID,
+                            game.firstMessageID,
+                            defaultGameText +
+                            `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
+                            `${game.participants.length > 0 ? game.participants.map(v => `${v.username
+                                ?
+                                `${v.name} (${mention({ username: v.username ? "@" + v.username : v.name, id: v.id })})`
+                                :
+                                mention({ username: v.username ? "@" + v.username : v.name, id: v.id })} ${v.alive ? "Победитель!" : "Умер"}`).join("\n") : "..."}`,
+                            {
+                                parse_mode: "HTML"
+                            }
+                        )
+
+                        await ctx.reply(
+                            [
+                                `Игра окончена!\nИгра длилась ${game.round}`,
+                                `Победитель: ${winner.username
+                                    ?
+                                    `${winner.name} (${mention({ username: winner.username ? "@" + winner.username : winner.name, id: winner.id })})`
+                                    :
+                                    mention({ username: winner.username ? "@" + winner.username : winner.name, id: winner.id })}`
+                            ].join("\n"),
+                            {
+                                reply_parameters: { message_id: game.lastMessageID },
+                                parse_mode: "HTML"
+                            })
+
                         endGame(gameID)
                         return
                     }
@@ -175,15 +206,14 @@ export async function rouletteCommand(bot: Bot) {
                             :
                             mention({ username: v.username ? "@" + v.username : v.name, id: v.id })} ${v.alive ? "Живой" : "Умер"}`).join("\n") : "..."}`,
                         {
-                            parse_mode: "HTML",
-                            reply_markup: game.buttons
+                            parse_mode: "HTML"
                         }
                     )
 
                     const newMsg = await ctx.reply(
                         [
                             `Раунд №${game.round}`,
-                            aliveRats.map(v => `${v.name} - ${v.alive ? "выжил" : "убит"}`)
+                            aliveRats.map(v => `${v.name} - ${v.alive ? "выжил" : "убит"}`).join("\n")
                         ].join("\n"),
                         {
                             reply_parameters: { message_id: game.lastMessageID },
