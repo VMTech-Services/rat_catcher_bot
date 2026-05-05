@@ -149,7 +149,7 @@ export async function rouletteCommand(bot: Bot) {
                                 ?
                                 `${v.name} (${mention({ username: v.username ? "@" + v.username : v.name, id: v.id })})`
                                 :
-                                mention({ username: v.username ? "@" + v.username : v.name, id: v.id })} ${v.alive ? "Победитель!" : "Умер"}`).join("\n") : "..."}`,
+                                mention({ username: v.username ? "@" + v.username : v.name, id: v.id })} ${v.alive ? "<b>Победитель!</b>" : "Умер"}`).join("\n") : "..."}`,
                             {
                                 parse_mode: "HTML"
                             }
@@ -176,6 +176,7 @@ export async function rouletteCommand(bot: Bot) {
                     rerollRevolver(gameID)
 
                     while (game.revolver.length > 0) {
+                        game.currentRat++
                         if (!aliveRats[game.currentRat]) {
                             game.currentRat = 0
                             continue
@@ -224,7 +225,6 @@ export async function rouletteCommand(bot: Bot) {
 
                     await sleep(randomInt(2000, 5000))
                 }
-
             }; break;
             //region cancel game
             case "cnc": {
