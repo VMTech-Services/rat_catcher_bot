@@ -82,12 +82,14 @@ export async function rouletteCommand(bot: Bot) {
 
     //region cg query
     bot.callbackQuery(/^rlt:(.+):(.+)$/, async (ctx) => {
-        await ctx.answerCallbackQuery()
         const gameID = ctx.match[1]
         const game = rouletteMemory[gameID]
 
         if (!game) {
-            ctx.reply("Этой игры больше нет!")
+            await ctx.answerCallbackQuery({
+                text: "Этой игры больше нет!",
+                show_alert: true
+            })
             return
         }
 
@@ -247,5 +249,7 @@ export async function rouletteCommand(bot: Bot) {
                 endGame(gameID)
             }; break;
         }
+
+        await ctx.answerCallbackQuery()
     })
 }
