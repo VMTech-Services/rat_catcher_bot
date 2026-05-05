@@ -13,7 +13,6 @@ RUN npm ci --omit=dev
 RUN npm run prisma:generate
 
 COPY assets ./assets
-COPY ratimages ./ratimages
 
 copy prisma.config.ts ./
 
