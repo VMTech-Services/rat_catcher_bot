@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 
-const dirfiles = await readdir("./ratimages", { withFileTypes: true })
+const dirfiles = await readdir("./assets/ratimages", { withFileTypes: true })
 
 export const ratImgFiles = dirfiles.length
 
