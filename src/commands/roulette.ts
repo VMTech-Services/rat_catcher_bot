@@ -14,7 +14,8 @@ const rouletteMemory: Record<string, {
     round: number
     currentRat: number
     revolver: boolean[],
-    initiatorID: number
+    initiatorID: number,
+    updateTimeout?: NodeJS.Timeout // <-- Добавили таймер для защиты от спама
 }> = {}
 
 function createGame(chatID: number, initiatorID: number) {
@@ -36,6 +37,10 @@ function createGame(chatID: number, initiatorID: number) {
 }
 
 function endGame(gameID: string) {
+    const game = rouletteMemory[gameID];
+    if (game && game.updateTimeout) {
+        clearTimeout(game.updateTimeout); // Очищаем таймер, если игра окончена
+    }
     delete rouletteMemory[gameID]
 }
 
@@ -50,6 +55,56 @@ const defaultGameText = [
     "- Нажмите кнопку \"Участвовать\" что-бы присоедениться\n- Нажмите начать что-бы.. начать.\n- Я сделаю выстрел в каждого из револьвера по очереди, когда пули кончатся, я заряжу новый барабан и продолжу так делать, пока не останется в живых кто-то 1.\n",
     "- Ну что, поиграем?"
 ].join("\n")
+
+// Вспомогательная функция для генерации текста со списком участников
+function getParticipantsText(game: typeof rouletteMemory[string], showStatus = false) {
+    if (game.participants.length === 0) return "...";
+
+    return game.participants.map(v => {
+        const userMention = v.username
+            ? `${v.name} (${mention({ username: "@" + v.username, id: v.id })})`
+            : mention({ username: v.name, id: v.id });
+
+        if (!showStatus) return userMention;
+        return `${userMention} ${v.alive ? "Живой" : "<b>Умер</b>"}`;
+    }).join("\n");
+}
+
+// Функция для безопасного и отложенного обновления сообщения
+function scheduleMessageUpdate(bot: Bot, gameID: string) {
+    const game = rouletteMemory[gameID];
+    if (!game) return;
+
+    // Если таймер уже запущен, просто ждем. 
+    // Это не даст отправлять больше 1 запроса в 1.5 секунды.
+    if (game.updateTimeout) return;
+
+    game.updateTimeout = setTimeout(async () => {
+        const currentGame = rouletteMemory[gameID];
+        if (!currentGame) return; // Игра могла уже закончиться
+
+        currentGame.updateTimeout = undefined;
+
+        try {
+            await bot.api.editMessageText(
+                currentGame.chatID,
+                currentGame.firstMessageID,
+                defaultGameText +
+                `\n\nУчастники${currentGame.participants.length > 0 ? ` (${currentGame.participants.length})` : ""}:\n` +
+                getParticipantsText(currentGame),
+                {
+                    parse_mode: "HTML",
+                    reply_markup: currentGame.buttons
+                }
+            );
+        } catch (error: any) {
+            // Игнорируем ошибку "сообщение не изменилось" (часто бывает при спаме кнопок)
+            if (!error.message?.includes("message is not modified")) {
+                console.error("Ошибка при обновлении лобби рулетки:", error);
+            }
+        }
+    }, 1500); // Задержка 1.5 секунды
+}
 
 export async function rouletteCommand(bot: Bot) {
     //region command
@@ -96,51 +151,44 @@ export async function rouletteCommand(bot: Bot) {
         switch (ctx.match[2]) {
             //region participate
             case "pt": {
-                if (game.participants.some(v => v.id === ctx.from.id)) return
+                if (game.participants.some(v => v.id === ctx.from.id)) {
+                    await ctx.answerCallbackQuery("Вы уже участвуете!");
+                    return;
+                }
 
-                game.participants.push({ id: ctx.from.id, name: ctx.from.first_name, username: ctx.from.username, alive: true })
+                game.participants.push({ id: ctx.from.id, name: ctx.from.first_name, username: ctx.from.username, alive: true });
 
-                await bot.api.editMessageText(
-                    game.chatID,
-                    game.firstMessageID,
-                    defaultGameText +
-                    `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
-                    game.participants.map(v => v.username
-                        ?
-                        `${v.name} (${mention({ username: v.username ? "@" + v.username : v.name, id: v.id })})`
-                        :
-                        mention({ username: v.username ? "@" + v.username : v.name, id: v.id })).join("\n"),
-                    {
-                        parse_mode: "HTML",
-                        reply_markup: game.buttons
-                    }
-                )
+                // Сразу отвечаем пользователю, чтобы кнопка не висела в загрузке
+                await ctx.answerCallbackQuery("Вы присоединились! 🎯");
+
+                // Запрашиваем обновление сообщения (оно произойдет с задержкой)
+                scheduleMessageUpdate(bot, gameID);
             }; break;
+
             //region cancel part
             case "cp": {
-                if (!game.participants.some(v => v.id === ctx.from.id)) return
+                if (!game.participants.some(v => v.id === ctx.from.id)) {
+                    await ctx.answerCallbackQuery("Вы не участвуете!");
+                    return;
+                }
 
                 game.participants = game.participants.filter(v => v.id !== ctx.from.id);
 
-                await bot.api.editMessageText(
-                    game.chatID,
-                    game.firstMessageID,
-                    defaultGameText +
-                    `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
-                    `${game.participants.length > 0 ? game.participants.map(v => v.username
-                        ?
-                        `${v.name} (${mention({ username: v.username ? "@" + v.username : v.name, id: v.id })})`
-                        :
-                        mention({ username: v.username ? "@" + v.username : v.name, id: v.id })).join("\n") : "..."}`,
-                    {
-                        parse_mode: "HTML",
-                        reply_markup: game.buttons
-                    }
-                )
+                await ctx.answerCallbackQuery("Вы покинули игру 🏃‍♂️");
+                scheduleMessageUpdate(bot, gameID);
             }; break;
+
             //region start game
             case "st": {
-                if (ctx.from.id !== game.initiatorID) return
+                if (ctx.from.id !== game.initiatorID) {
+                    await ctx.answerCallbackQuery("Только создатель может начать игру!");
+                    return;
+                }
+
+                await ctx.answerCallbackQuery("Игра начинается! 🎲");
+
+                // Если есть запланированное обновление лобби, отменяем его, так как мы сейчас обновим всё сами
+                if (game.updateTimeout) clearTimeout(game.updateTimeout);
 
                 while (true) {
                     const aliveRats = game.participants.filter(rat => rat.alive)
@@ -148,34 +196,27 @@ export async function rouletteCommand(bot: Bot) {
                     if (aliveRats.length === 1) {
                         const winner = aliveRats[0]
 
-                        await bot.api.editMessageText(
-                            game.chatID,
-                            game.firstMessageID,
-                            defaultGameText +
-                            `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
-                            `${game.participants.length > 0 ? game.participants.map(v => `${v.username
-                                ?
-                                `${v.name} (${mention({ username: v.username ? "@" + v.username : v.name, id: v.id })})`
-                                :
-                                mention({ username: v.username ? "@" + v.username : v.name, id: v.id })} ${v.alive ? "<b>Победитель!</b>" : "Умер"}`).join("\n") : "..."}`,
-                            {
-                                parse_mode: "HTML"
-                            }
-                        )
+                        try {
+                            await bot.api.editMessageText(
+                                game.chatID,
+                                game.firstMessageID,
+                                defaultGameText +
+                                `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
+                                getParticipantsText(game, true).replace("Живой", "<b>Победитель!</b>"),
+                                { parse_mode: "HTML" }
+                            )
 
-                        await ctx.reply(
-                            [
-                                `Игра окончена!\nИгра длилась ${game.round}`,
-                                `Победитель: ${winner.username
-                                    ?
-                                    `${winner.name} (${mention({ username: winner.username ? "@" + winner.username : winner.name, id: winner.id })})`
-                                    :
-                                    mention({ username: winner.username ? "@" + winner.username : winner.name, id: winner.id })}`
-                            ].join("\n"),
-                            {
-                                reply_parameters: { message_id: game.lastMessageID },
-                                parse_mode: "HTML"
-                            })
+                            await ctx.reply(
+                                [
+                                    `Игра окончена!\nИгра длилась ${game.round} раундов`,
+                                    `Победитель: ${winner.username ? `${winner.name} (@${winner.username})` : winner.name}`
+                                ].join("\n"),
+                                {
+                                    reply_parameters: { message_id: game.lastMessageID },
+                                    parse_mode: "HTML"
+                                }
+                            )
+                        } catch (e) { console.error(e) }
 
                         endGame(gameID)
                         return
@@ -204,52 +245,59 @@ export async function rouletteCommand(bot: Bot) {
                         game.participants[editableRat].alive = rat.alive
                     }
 
-                    await bot.api.editMessageText(
-                        game.chatID,
-                        game.firstMessageID,
-                        defaultGameText +
-                        `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
-                        `${game.participants.length > 0 ? game.participants.map(v => `${v.username
-                            ?
-                            `${v.name} (${mention({ username: v.username ? "@" + v.username : v.name, id: v.id })})`
-                            :
-                            mention({ username: v.username ? "@" + v.username : v.name, id: v.id })} ${v.alive ? "Живой" : "Умер"}`).join("\n") : "..."}`,
-                        {
-                            parse_mode: "HTML"
-                        }
-                    )
+                    try {
+                        await bot.api.editMessageText(
+                            game.chatID,
+                            game.firstMessageID,
+                            defaultGameText +
+                            `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
+                            getParticipantsText(game, true),
+                            { parse_mode: "HTML" }
+                        )
 
-                    const newMsg = await ctx.reply(
-                        [
-                            `Раунд №${game.round}`,
-                            aliveRats.map(v => `${v.name} - ${v.alive ? "выжил" : "убит"}`).join("\n")
-                        ].join("\n"),
-                        {
-                            reply_parameters: { message_id: game.lastMessageID },
-                            parse_mode: "HTML"
-                        })
-
-                    game.lastMessageID = newMsg.message_id
+                        const newMsg = await ctx.reply(
+                            [
+                                `Раунд №${game.round}`,
+                                aliveRats.map(v => `${v.name} - ${v.alive ? "выжил" : "убит"}`).join("\n")
+                            ].join("\n"),
+                            {
+                                reply_parameters: { message_id: game.lastMessageID },
+                                parse_mode: "HTML"
+                            }
+                        )
+                        game.lastMessageID = newMsg.message_id
+                    } catch (e) {
+                        console.error("Ошибка во время игры:", e);
+                    }
 
                     await sleep(randomInt(2000, 5000))
                 }
             }; break;
+
             //region cancel game
             case "cnc": {
-                if (ctx.from.id !== game.initiatorID) return
+                if (ctx.from.id !== game.initiatorID) {
+                    await ctx.answerCallbackQuery("Только создатель может отменить игру!");
+                    return;
+                }
 
-                await bot.api.editMessageText(
-                    game.chatID,
-                    game.firstMessageID,
-                    defaultGameText +
-                    "\n\n- Ладно, меня позвали куда-то ещё, <b>игра отменена</b>!",
-                    { parse_mode: "HTML" }
-                )
+                await ctx.answerCallbackQuery("Игра отменена!");
+
+                try {
+                    await bot.api.editMessageText(
+                        game.chatID,
+                        game.firstMessageID,
+                        defaultGameText +
+                        "\n\n- Ладно, меня позвали куда-то ещё, <b>игра отменена</b>!",
+                        { parse_mode: "HTML" }
+                    )
+                } catch (e) { } // Игнорируем ошибки при отмене
 
                 endGame(gameID)
             }; break;
         }
 
-        await ctx.answerCallbackQuery()
+        // На всякий случай, если в case не было ответа:
+        try { await ctx.answerCallbackQuery() } catch (e) { }
     })
 }
