@@ -85,7 +85,7 @@ export default async function infoCommand(bot: Bot) {
 
                 const lastRats = await db.chatRat.findMany({
                     where: { chatId: ctx.chat.id },
-                    orderBy: { userId: "desc" },
+                    orderBy: { date: "desc" },
                     take: 10,
                     include: { user: true }
                 });
