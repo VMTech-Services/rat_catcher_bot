@@ -1,5 +1,6 @@
 import { Bot } from "grammy";
 import pkg from "../../package.json" with {type: "json"}
+import globalConfig from "../globalConfig.json" with {type: "json"}
 import db from "../lib/db.js";
 import { participantForms, pluralize, ratForms } from "../lib/pluralize.js";
 
@@ -22,7 +23,7 @@ export default async function infoCommand(bot: Bot) {
 
         ctx.reply([
             "<b>Крысолов от VMTech</b>",
-            `Версия: ${pkg.version}`,
+            `Версия: ${pkg.version} (${globalConfig.versionDesc})`,
             `Ищу ${chatUsers} ${pluralize(chatUsers, ratForms)} среди ${chats} чатов`,
             `Уже поймал ${totalRatsCatched} ${pluralize(totalRatsCatched, ratForms)} среди всех чатов`,
             "",

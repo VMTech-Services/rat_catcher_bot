@@ -3,19 +3,37 @@ import { InlineKeyboardMarkup } from "grammy/types";
 import { randomInt, randomUUID } from "node:crypto";
 import mention from "../lib/userMentioner.js";
 
+const defaultGameText = [
+    "- Значит крысы захотели сыграть в рулетку?",
+    "- Я пришёл на нормальную перестрелку!",
+    "- Повылезали из своих дыр... несите пули!",
+    "- Нет зарраза! <b>ХВАТИТ ЖРАТЬ ПУЛИ!!!</b>",
+]
+
+const gameDesc = [
+    "- Игра использует 6-зарядный револьвер.",
+    "- В игре есть счётчик текущего игрока и он запоминает последнего игрока между раундами.",
+    "- В начале каждого раунда, барабан наполняется случайным образом, где есть 1 пуля.",
+    "- Последовательно, делается 1 попытка выстрела в каждого.",
+    "- Когда кого-то убивают, раунд заканчивается, если живых больше 1, начинается новый раунд, револьвер перезаряжается и Крысолов продолжает идти по списку.",
+    "- Побеждает тот кто остаётся в живых последним.",
+].join("\n")
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const rouletteMemory: Record<string, {
     chatID: number
     firstMessageID: number
     lastMessageID: number
-    buttons: InlineKeyboardMarkup | undefined
-    participants: { id: number, name: string, username: string | undefined, alive: boolean }[]
+    buttons: Function
+    participants: { id: number, name: string, username: string | undefined, alive: string }[]
     round: number
     currentRat: number
     revolver: boolean[],
     initiatorID: number,
-    updateTimeout?: NodeJS.Timeout // <-- Добавили таймер для защиты от спама
+    updateTimeout?: NodeJS.Timeout,
+    descriptionEnabled: boolean,
+    baseGameText: string
 }> = {}
 
 function createGame(chatID: number, initiatorID: number) {
@@ -25,12 +43,14 @@ function createGame(chatID: number, initiatorID: number) {
         chatID: chatID,
         firstMessageID: 0,
         lastMessageID: 0,
-        buttons: undefined,
+        buttons: () => { },
         participants: [],
         round: 0,
         currentRat: 0,
         revolver: [],
-        initiatorID
+        initiatorID,
+        descriptionEnabled: true,
+        baseGameText: defaultGameText[randomInt(0, defaultGameText.length - 1)]
     }
 
     return gameId
@@ -49,13 +69,6 @@ function rerollRevolver(gameID: string) {
     rouletteMemory[gameID].revolver[randomInt(0, 5)] = true
 }
 
-const defaultGameText = [
-    "- Значит крысы захотели сыграть в рулетку?\n",
-    "- Так тому и быть, вот правила:\n",
-    "- Нажмите кнопку \"Участвовать\" что-бы присоедениться\n- Нажмите начать что-бы.. начать.\n- Я сделаю выстрел в каждого из револьвера по очереди, когда пули кончатся, я заряжу новый барабан и продолжу так делать, пока не останется в живых кто-то 1.\n",
-    "- Ну что, поиграем?"
-].join("\n")
-
 // Вспомогательная функция для генерации текста со списком участников
 function getParticipantsText(game: typeof rouletteMemory[string], showStatus = false) {
     if (game.participants.length === 0) return "...";
@@ -66,7 +79,7 @@ function getParticipantsText(game: typeof rouletteMemory[string], showStatus = f
             : mention({ username: v.name, id: v.id });
 
         if (!showStatus) return userMention;
-        return `${userMention} ${v.alive ? "Живой" : "<b>Умер</b>"}`;
+        return `${userMention} ${{ alive: "живой", survived: "🥳 выжил", dead: "☠️ убит" }[v.alive]}`;
     }).join("\n");
 }
 
@@ -89,12 +102,12 @@ function scheduleMessageUpdate(bot: Bot, gameID: string) {
             await bot.api.editMessageText(
                 currentGame.chatID,
                 currentGame.firstMessageID,
-                defaultGameText +
+                currentGame.baseGameText +
                 `\n\nУчастники${currentGame.participants.length > 0 ? ` (${currentGame.participants.length})` : ""}:\n` +
                 getParticipantsText(currentGame),
                 {
                     parse_mode: "HTML",
-                    reply_markup: currentGame.buttons
+                    reply_markup: currentGame.buttons()
                 }
             );
         } catch (error: any) {
@@ -118,21 +131,28 @@ export async function rouletteCommand(bot: Bot) {
 
         const game = createGame(ctx.chat.id, ctx.from.id)
 
-        const buttons = new InlineKeyboard()
-            .text("Участвовать", `rlt:${game}:pt`).row()
-            .text("Отмена участия", `rlt:${game}:cp`).row()
-            .text(`Начать (${ctx.from.first_name})`, `rlt:${game}:st`).row()
-            .text(`Отмена (${ctx.from.first_name})`, `rlt:${game}:cnc`)
+        const getBaseButtons = () => {
+            const buttons = new InlineKeyboard()
+                .text("Участвовать", `rlt:${game}:pt`).row()
+                .text("Отмена участия", `rlt:${game}:cp`).row()
+                .text(`Начать (${ctx.from!.first_name})`, `rlt:${game}:st`).row()
+                .text(`Отмена (${ctx.from!.first_name})`, `rlt:${game}:cnc`);
 
-        const msg = await ctx.reply(defaultGameText + `\n\nУчастники:\n...`, {
+            if (rouletteMemory[game].descriptionEnabled) buttons.row()
+                .text("Описание игры", `rlt:${game}:desc`)
+            return buttons
+        };
+
+        rouletteMemory[game].buttons = getBaseButtons
+
+        const msg = await ctx.reply(rouletteMemory[game].baseGameText + `\n\nУчастники:\n...`, {
             parse_mode: "HTML",
-            reply_markup: buttons
+            reply_markup: rouletteMemory[game].buttons()
         })
 
         rouletteMemory[game].chatID = ctx.chat.id
         rouletteMemory[game].firstMessageID = msg.message_id
         rouletteMemory[game].lastMessageID = msg.message_id
-        rouletteMemory[game].buttons = buttons
     })
 
     //region cg query
@@ -149,6 +169,16 @@ export async function rouletteCommand(bot: Bot) {
         }
 
         switch (ctx.match[2]) {
+            //region desc
+            case "desc": {
+                await bot.api.sendMessage(game.chatID, gameDesc, { reply_parameters: { message_id: game.firstMessageID } })
+
+                await ctx.answerCallbackQuery("Вот правила!");
+
+                game.descriptionEnabled = false
+
+                scheduleMessageUpdate(bot, gameID);
+            }; break;
             //region participate
             case "pt": {
                 if (game.participants.some(v => v.id === ctx.from.id)) {
@@ -156,12 +186,10 @@ export async function rouletteCommand(bot: Bot) {
                     return;
                 }
 
-                game.participants.push({ id: ctx.from.id, name: ctx.from.first_name, username: ctx.from.username, alive: true });
+                game.participants.push({ id: ctx.from.id, name: ctx.from.first_name, username: ctx.from.username, alive: "alive" });
 
-                // Сразу отвечаем пользователю, чтобы кнопка не висела в загрузке
                 await ctx.answerCallbackQuery("Вы присоединились! 🎯");
 
-                // Запрашиваем обновление сообщения (оно произойдет с задержкой)
                 scheduleMessageUpdate(bot, gameID);
             }; break;
 
@@ -185,13 +213,44 @@ export async function rouletteCommand(bot: Bot) {
                     return;
                 }
 
-                await ctx.answerCallbackQuery("Игра начинается! 🎲");
+                if (game.participants.length === 0) {
+                    await ctx.answerCallbackQuery("В игре должен быть минимум 1 игрок!");
+                    return;
+                }
+
+                await ctx.answerCallbackQuery("Игра начинается!");
 
                 // Если есть запланированное обновление лобби, отменяем его, так как мы сейчас обновим всё сами
                 if (game.updateTimeout) clearTimeout(game.updateTimeout);
 
+                if (game.participants.length === 1) {
+                    await bot.api.sendMessage(game.chatID, "- Ой, а что это у нас тут такое?")
+
+                    await sleep(5000)
+
+                    const v = game.participants[0]
+
+                    const userMention = v.username
+                        ? `${v.name} (${mention({ username: "@" + v.username, id: v.id })})`
+                        : mention({ username: v.name, id: v.id });
+
+                    await bot.api.sendMessage(game.chatID, `- Ты у нас один?\n\n- Да?\n\n- ${userMention} ...`)
+
+                    await sleep(5000)
+
+                    await bot.api.sendMessage(game.chatID, "- Ну ничего... <b>Я сыграю с тобой.</b>", { parse_mode: "HTML" })
+
+                    await sleep(2000)
+
+                    await bot.api.sendMessage(game.chatID, `<i><b>${mention({ username: "Крысолов", id: bot.botInfo.id })} присоеденился к игре!</b></i>`, { reply_parameters: { message_id: game.firstMessageID }, parse_mode: "HTML" })
+
+                    game.participants.push({ id: bot.botInfo.id, name: "Крысолов", username: undefined, alive: "alive" });
+
+                    await sleep(5000)
+                }
+
                 while (true) {
-                    const aliveRats = game.participants.filter(rat => rat.alive)
+                    const aliveRats = game.participants.filter(rat => rat.alive !== "dead").map(v => { v.alive = "alive"; return v })
 
                     if (aliveRats.length === 1) {
                         const winner = aliveRats[0]
@@ -200,7 +259,7 @@ export async function rouletteCommand(bot: Bot) {
                             await bot.api.editMessageText(
                                 game.chatID,
                                 game.firstMessageID,
-                                defaultGameText +
+                                game.baseGameText +
                                 `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
                                 getParticipantsText(game, true).replace("Живой", "<b>Победитель!</b>"),
                                 { parse_mode: "HTML" }
@@ -224,19 +283,22 @@ export async function rouletteCommand(bot: Bot) {
 
                     rerollRevolver(gameID)
 
+                    const revolverState = game.revolver.map(v => v)
+
                     while (game.revolver.length > 0) {
                         game.currentRat++
-                        if (!aliveRats[game.currentRat]) {
+                        if (game.currentRat >= aliveRats.length) {
                             game.currentRat = 0
-                            continue
                         }
 
                         const revolerRound = game.revolver.pop()
 
                         if (revolerRound) {
-                            aliveRats[game.currentRat].alive = false
+                            aliveRats[game.currentRat].alive = "dead"
                             game.round++
                             break
+                        } else {
+                            aliveRats[game.currentRat].alive = "survived"
                         }
                     }
 
@@ -249,7 +311,7 @@ export async function rouletteCommand(bot: Bot) {
                         await bot.api.editMessageText(
                             game.chatID,
                             game.firstMessageID,
-                            defaultGameText +
+                            game.baseGameText +
                             `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
                             getParticipantsText(game, true),
                             { parse_mode: "HTML" }
@@ -257,8 +319,10 @@ export async function rouletteCommand(bot: Bot) {
 
                         const newMsg = await ctx.reply(
                             [
-                                `Раунд №${game.round}`,
-                                aliveRats.map(v => `${v.name} - ${v.alive ? "выжил" : "убит"}`).join("\n")
+                                `Раунд №${game.round}\n`,
+                                aliveRats.map(v => `${v.name} - ${{ alive: "живой", survived: "🥳 выжил", dead: "☠️ убит" }[v.alive]}`).join("\n"),
+                                `\nРевольвер: ${revolverState.map(v => v ? "☠️" : "🥳").reverse().join(", ")}`,
+                                `Пропущено выстрелов: ${game.revolver.length}`
                             ].join("\n"),
                             {
                                 reply_parameters: { message_id: game.lastMessageID },
@@ -287,7 +351,7 @@ export async function rouletteCommand(bot: Bot) {
                     await bot.api.editMessageText(
                         game.chatID,
                         game.firstMessageID,
-                        defaultGameText +
+                        game.baseGameText +
                         "\n\n- Ладно, меня позвали куда-то ещё, <b>игра отменена</b>!",
                         { parse_mode: "HTML" }
                     )
