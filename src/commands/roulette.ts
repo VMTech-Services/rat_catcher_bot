@@ -10,6 +10,12 @@ const defaultGameText = [
     "- Нет зарраза! <b>ХВАТИТ ЖРАТЬ ПУЛИ!!!</b>",
 ]
 
+const finalText = [
+    "- Ох ё... ну и резня...",
+    "- РЕЗНЯ!!!",
+    "- Гильзы гильзы... Подметаем гильзы..."
+]
+
 const gameDesc = [
     "- Игра использует 6-зарядный револьвер.",
     "- В игре есть счётчик текущего игрока и он запоминает последнего игрока между раундами.",
@@ -33,7 +39,13 @@ const rouletteMemory: Record<string, {
     initiatorID: number,
     updateTimeout?: NodeJS.Timeout,
     descriptionEnabled: boolean,
-    baseGameText: string
+    baseGameText: string,
+    finalGameText: string
+}> = {}
+
+const leftoverMessages: Record<string, {
+    chatID: number,
+    messagesID: number[]
 }> = {}
 
 function createGame(chatID: number, initiatorID: number) {
@@ -50,7 +62,8 @@ function createGame(chatID: number, initiatorID: number) {
         revolver: [],
         initiatorID,
         descriptionEnabled: true,
-        baseGameText: defaultGameText[randomInt(0, defaultGameText.length - 1)]
+        baseGameText: defaultGameText[randomInt(0, defaultGameText.length - 1)],
+        finalGameText: finalText[randomInt(0, finalText.length - 1)]
     }
 
     return gameId
@@ -79,7 +92,7 @@ function getParticipantsText(game: typeof rouletteMemory[string], showStatus = f
             : mention({ username: v.name, id: v.id });
 
         if (!showStatus) return userMention;
-        return `${userMention} ${{ alive: "живой", survived: "🥳 выжил", dead: "☠️ убит" }[v.alive]}`;
+        return `${userMention} ${{ alive: "Победитель!", survived: "🥳 выжил", dead: "☠️ убит" }[v.alive]}`;
     }).join("\n");
 }
 
@@ -153,6 +166,8 @@ export async function rouletteCommand(bot: Bot) {
         rouletteMemory[game].chatID = ctx.chat.id
         rouletteMemory[game].firstMessageID = msg.message_id
         rouletteMemory[game].lastMessageID = msg.message_id
+
+        leftoverMessages[game] = { chatID: ctx.chat.id, messagesID: [] }
     })
 
     //region cg query
@@ -160,7 +175,7 @@ export async function rouletteCommand(bot: Bot) {
         const gameID = ctx.match[1]
         const game = rouletteMemory[gameID]
 
-        if (!game) {
+        if (!game && ctx.match[2] !== "clean") {
             await ctx.answerCallbackQuery({
                 text: "Этой игры больше нет!",
                 show_alert: true
@@ -171,7 +186,9 @@ export async function rouletteCommand(bot: Bot) {
         switch (ctx.match[2]) {
             //region desc
             case "desc": {
-                await bot.api.sendMessage(game.chatID, gameDesc, { reply_parameters: { message_id: game.firstMessageID } })
+                const msg = await bot.api.sendMessage(game.chatID, gameDesc, { reply_parameters: { message_id: game.firstMessageID } })
+
+                leftoverMessages[gameID].messagesID.push(msg.message_id)
 
                 await ctx.answerCallbackQuery("Вот правила!");
 
@@ -224,7 +241,7 @@ export async function rouletteCommand(bot: Bot) {
                 if (game.updateTimeout) clearTimeout(game.updateTimeout);
 
                 if (game.participants.length === 1) {
-                    await bot.api.sendMessage(game.chatID, "- Ой, а что это у нас тут такое?")
+                    leftoverMessages[gameID].messagesID.push((await bot.api.sendMessage(game.chatID, "- Ой, а что это у нас тут такое?")).message_id)
 
                     await sleep(5000)
 
@@ -234,15 +251,15 @@ export async function rouletteCommand(bot: Bot) {
                         ? `${v.name} (${mention({ username: "@" + v.username, id: v.id })})`
                         : mention({ username: v.name, id: v.id });
 
-                    await bot.api.sendMessage(game.chatID, `- Ты у нас один?\n\n- Да?\n\n- ${userMention} ...`)
+                    leftoverMessages[gameID].messagesID.push((await bot.api.sendMessage(game.chatID, `- Ты у нас один?\n\n- Да?\n\n- ${userMention} ...`)).message_id)
 
                     await sleep(5000)
 
-                    await bot.api.sendMessage(game.chatID, "- Ну ничего... <b>Я сыграю с тобой.</b>", { parse_mode: "HTML" })
+                    leftoverMessages[gameID].messagesID.push((await bot.api.sendMessage(game.chatID, "- Ну ничего... <b>Я сыграю с тобой.</b>", { parse_mode: "HTML" })).message_id)
 
                     await sleep(2000)
 
-                    await bot.api.sendMessage(game.chatID, `<i><b>${mention({ username: "Крысолов", id: bot.botInfo.id })} присоеденился к игре!</b></i>`, { reply_parameters: { message_id: game.firstMessageID }, parse_mode: "HTML" })
+                    leftoverMessages[gameID].messagesID.push((await bot.api.sendMessage(game.chatID, `<i><b>${mention({ username: "Крысолов", id: bot.botInfo.id })} присоеденился к игре!</b></i>`, { reply_parameters: { message_id: game.firstMessageID }, parse_mode: "HTML" })).message_id)
 
                     game.participants.push({ id: bot.botInfo.id, name: "Крысолов", username: undefined, alive: "alive" });
 
@@ -259,22 +276,25 @@ export async function rouletteCommand(bot: Bot) {
                             await bot.api.editMessageText(
                                 game.chatID,
                                 game.firstMessageID,
-                                game.baseGameText +
+                                game.finalGameText +
                                 `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
                                 getParticipantsText(game, true).replace("Живой", "<b>Победитель!</b>"),
                                 { parse_mode: "HTML" }
                             )
 
-                            await ctx.reply(
+                            const newMsg = await ctx.reply(
                                 [
                                     `Игра окончена!\nИгра длилась ${game.round} раундов`,
                                     `Победитель: ${winner.username ? `${winner.name} (@${winner.username})` : winner.name}`
                                 ].join("\n"),
                                 {
                                     reply_parameters: { message_id: game.lastMessageID },
-                                    parse_mode: "HTML"
+                                    parse_mode: "HTML",
+                                    reply_markup: new InlineKeyboard().text("Удалить мусор", `rlt:${gameID}:clean`)
                                 }
                             )
+
+                            leftoverMessages[gameID].messagesID.push(newMsg.message_id)
                         } catch (e) { console.error(e) }
 
                         endGame(gameID)
@@ -330,6 +350,8 @@ export async function rouletteCommand(bot: Bot) {
                             }
                         )
                         game.lastMessageID = newMsg.message_id
+
+                        leftoverMessages[gameID].messagesID.push(newMsg.message_id)
                     } catch (e) {
                         console.error("Ошибка во время игры:", e);
                     }
@@ -358,6 +380,11 @@ export async function rouletteCommand(bot: Bot) {
                 } catch (e) { } // Игнорируем ошибки при отмене
 
                 endGame(gameID)
+            }; break;
+
+            case "clean": {
+                await bot.api.deleteMessages(leftoverMessages[gameID].chatID, leftoverMessages[gameID].messagesID)
+                delete leftoverMessages[gameID]
             }; break;
         }
 
