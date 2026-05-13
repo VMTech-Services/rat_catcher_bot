@@ -92,7 +92,7 @@ function getParticipantsText(game: typeof rouletteMemory[string], showStatus = f
             : mention({ username: v.name, id: v.id });
 
         if (!showStatus) return userMention;
-        return `${userMention} ${{ alive: "Победитель!", survived: "🥳 выжил", dead: "☠️ убит" }[v.alive]}`;
+        return `${userMention} ${{ alive: "живой", survived: "🥳 выжил", dead: "☠️ убит", winner: "🥳 <b>победитель!</b>" }[v.alive]}`;
     }).join("\n");
 }
 
@@ -251,7 +251,7 @@ export async function rouletteCommand(bot: Bot) {
                         ? `${v.name} (${mention({ username: "@" + v.username, id: v.id })})`
                         : mention({ username: v.name, id: v.id });
 
-                    leftoverMessages[gameID].messagesID.push((await bot.api.sendMessage(game.chatID, `- Ты у нас один?\n\n- Да?\n\n- ${userMention} ...`)).message_id)
+                    leftoverMessages[gameID].messagesID.push((await bot.api.sendMessage(game.chatID, `- Ты у нас один?\n\n- Да?\n\n- ${userMention} ...`, { parse_mode: "HTML" })).message_id)
 
                     await sleep(5000)
 
@@ -272,13 +272,15 @@ export async function rouletteCommand(bot: Bot) {
                     if (aliveRats.length === 1) {
                         const winner = aliveRats[0]
 
+                        game.participants[game.participants.findIndex(v => v.id === winner.id)].alive = "winner"
+
                         try {
                             await bot.api.editMessageText(
                                 game.chatID,
                                 game.firstMessageID,
                                 game.finalGameText +
                                 `\n\nУчастники${game.participants.length > 0 ? ` (${game.participants.length})` : ""}:\n` +
-                                getParticipantsText(game, true).replace("Живой", "<b>Победитель!</b>"),
+                                getParticipantsText(game, true),
                                 { parse_mode: "HTML" }
                             )
 
@@ -306,7 +308,6 @@ export async function rouletteCommand(bot: Bot) {
                     const revolverState = game.revolver.map(v => v)
 
                     while (game.revolver.length > 0) {
-                        game.currentRat++
                         if (game.currentRat >= aliveRats.length) {
                             game.currentRat = 0
                         }
@@ -316,9 +317,11 @@ export async function rouletteCommand(bot: Bot) {
                         if (revolerRound) {
                             aliveRats[game.currentRat].alive = "dead"
                             game.round++
+                            game.currentRat++
                             break
                         } else {
                             aliveRats[game.currentRat].alive = "survived"
+                            game.currentRat++
                         }
                     }
 
