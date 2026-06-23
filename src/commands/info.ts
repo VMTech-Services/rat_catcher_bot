@@ -114,7 +114,7 @@ export default async function infoCommand(bot: Bot) {
                     include: { user: true }
                 });
 
-                let ratsList = allRats.map(v => mention({ username: v.user.username, id: Number(v.user.id) })).join("\n");
+                let ratsList = allRats.map(v => `${mention({ username: v.user.username, id: Number(v.user.id) })} (${v.ratCount} раз)`).join("\n");
 
                 if (ratsList.length > 3900) {
                     ratsList = ratsList.slice(0, 3900) + "\n\n...<i>и другие (список слишком длинный)</i>";

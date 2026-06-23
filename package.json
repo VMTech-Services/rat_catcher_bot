@@ -1,6 +1,6 @@
 {
     "name": "rat_catcher_bot",
-    "version": "2.1.5",
+    "version": "2.1.6",
     "main": "bot.js",
     "type": "module",
     "private": true,
