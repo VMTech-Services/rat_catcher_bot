@@ -27,7 +27,6 @@ model Chat {
     id               BigInt   @id @unique
     chatName         String
     joinDate         DateTime @default(now())
-    lastPinnedRatMsg BigInt?
 
     chatUsers ChatUser[]
     chatRats  ChatRat[]

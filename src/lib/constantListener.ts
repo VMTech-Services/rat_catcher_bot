@@ -110,22 +110,6 @@ export async function registerRatSelector(bot: Bot) {
                 })
 
                 chatsSuccess += 1
-
-                try {
-                    if (chat.lastPinnedRatMsg) {
-                        await bot.api.unpinChatMessage(chatId, Number(chat.lastPinnedRatMsg))
-                    }
-
-                    await bot.api.pinChatMessage(chatId, msgData.message_id, { disable_notification: true })
-                    await db.chat.update({
-                        where: {
-                            id: chatId
-                        },
-                        data: {
-                            lastPinnedRatMsg: msgData.message_id
-                        }
-                    })
-                } catch { }
             }
 
             chatsAsync.push(ratSelectWrapper())
